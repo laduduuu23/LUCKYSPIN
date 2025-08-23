@@ -1,0 +1,562 @@
+a<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="bwport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Spin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Animasi kilau emas border lebih halus */
+        @keyframes goldShine {
+            0% { box-shadow: 0 0 12px 2px #FFD700, 0 2px 16px rgba(0,0,0,0.08); border-color: #FFD700; }
+            50% { box-shadow: 0 0 24px 6px #FFFACD, 0 2px 16px rgba(0,0,0,0.08); border-color: #FFFACD; }
+            100% { box-shadow: 0 0 12px 2px #FFD700, 0 2px 16px rgba(0,0,0,0.08); border-color: #FFD700; }
+        }
+        #lucky-wheel, #spinBtn, .glass, #popup-modal > div, #fake-leaderboard {
+            animation: goldShine 4s infinite linear;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background: url('abolfazl-sorkhi-Wg3-Sh7Zh9w-unsplash.jpg') center center / cover no-repeat fixed;
+            color: #fff;
+            overflow: hidden;
+        }
+    /* Hapus grid background effect, gunakan gambar */
+
+        /* Wheel glow effect */
+        #lucky-wheel {
+            box-shadow: 0 0 24px 0 rgba(59,130,246,0.18), 0 0 0 4px rgba(59,130,246,0.08), 0 0 12px 2px #FFD700;
+            border: 2px solid #FFD700;
+            transition: box-shadow 0.5s, border 0.5s;
+        }
+
+        /* Spin button subtle pulse */
+        #spinBtn {
+            animation: spinPulse 2s infinite alternate;
+            box-shadow: 0 0 8px 1px #FFD700, 0 0 4px 1px #3b82f6;
+            border: 2px solid #FFD700;
+        }
+        @keyframes spinPulse {
+            0% { box-shadow: 0 0 15px 0 rgba(59,130,246,0.7); }
+            100% { box-shadow: 0 0 30px 8px rgba(59,130,246,0.3); }
+        }
+
+        /* Glassmorphism effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.10);
+            border-radius: 18px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.10), 0 0 8px 2px #FFD700;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 2px solid #FFD700;
+            padding: 2rem 1.2rem;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #0e1a3b 0%, #06112d 100%);
+        }
+
+        #popup-modal > div {
+            box-shadow: 0 0 8px 2px #FFD700, 0 2px 16px rgba(0,0,0,0.08);
+            border: 2px solid #FFD700;
+        }
+
+        /* Spin button glow */
+        .spin-button {
+            transition: all 0.3s cubic-bezier(.4,2,.3,1);
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        .spin-button:hover {
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.8);
+            transform: scale(1.04);
+        }
+
+        /* Toast notifications */
+        .toast {
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Custom spinner colors */
+        .wheel-segment {
+            transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4 gradient-bg">
+    <!-- Teks hadiah animasi -->
+    <div id="prize-badge" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;font-size:2.5rem;font-weight:bold;color:#FFD700;text-shadow:0 2px 16px #000,0 0 8px #FFD700;pointer-events:none;transition:opacity 0.7s,transform 0.7s;"></div>
+    <!-- Overlay blur dan gelap -->
+    <div style="position:fixed;inset:0;z-index:0;pointer-events:none;background:rgba(15,23,42,0.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);"></div>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="absolute inset-0 flex flex-col items-center justify-center z-50 bg-gray-900 bg-opacity-75 hidden">
+        <div class="w-64 h-3 bg-gray-700 rounded-full overflow-hidden">
+            <div id="progress-bar" class="h-full bg-blue-500 rounded-full" style="width:0%"></div>
+        </div>
+        <span class="mt-4 text-white text-lg font-medium">Memverifikasi kupon...</span>
+    </div>
+
+    <!-- Main Container -->
+    <div id="main-container" class="w-full max-w-md mx-auto">
+    <!-- Confetti Canvas -->
+    <canvas id="confetti-canvas" class="fixed inset-0 w-full h-full pointer-events-none z-50" style="display:none;"></canvas>
+
+        <!-- Screen A - Gate (Login) -->
+        <div id="gate-screen" class="glass rounded-xl flex flex-col items-center justify-center p-8 transition-opacity duration-500 ease-in-out">
+            <h1 class="text-3xl font-bold mb-2 text-center text-blue-400">Selamat Datang!</h1>
+            <p class="text-gray-300 text-sm mb-8 text-center">Silakan masukkan ID dan Kupon Anda untuk memulai.</p>
+            <form id="login-form" class="w-full space-y-4">
+                <div class="space-y-2">
+                    <label for="userId" class="block text-sm font-medium text-gray-400">ID Pengguna</label>
+                    <input type="text" id="userId" name="userId" minlength="4" required placeholder="Minimal 4 karakter" class="w-full px-4 py-3 rounded-lg bg-gray-700 bg-opacity-50 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                </div>
+                <div class="space-y-2">
+                    <label for="couponCode" class="block text-sm font-medium text-gray-400">Kode Kupon</label>
+                    <input type="text" id="couponCode" name="couponCode" required placeholder="Contoh: FREECOUPON" class="w-full px-4 py-3 rounded-lg bg-gray-700 bg-opacity-50 border border-gray-600 uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-300">
+                </div>
+                <button type="submit" id="submitBtn" disabled class="w-full py-3 mt-6 rounded-full font-bold text-white bg-blue-500 hover:bg-blue-600 transition duration-300 disabled:bg-gray-500 disabled:cursor-not-allowed spin-button">Masuk</button>
+            </form>
+        </div>
+
+        <!-- Screen B - Lucky Spin -->
+        <div id="spin-screen" class="glass rounded-xl flex-col items-center justify-center p-6 hidden opacity-0 transition-opacity duration-500 ease-in-out">
+            <!-- Dihapus: ID dan Kupon -->
+            <!-- Lucky Spin Wheel + Arrow -->
+            <div class="w-full flex justify-center relative">
+                <!-- Arrow indicator with WIN text -->
+                <div style="position:absolute;top:-38px;left:50%;transform:translateX(-50%);z-index:10;">
+                    <svg width="60" height="38" viewBox="0 0 60 38">
+                        <polygon points="30,0 55,0 50,28 30,38 10,28 5,0 30,0" fill="#f59e0b" stroke="#fff" stroke-width="2"/>
+                        <text x="30" y="20" text-anchor="middle" font-size="16" font-family="Inter,Arial,sans-serif" fill="#fff" font-weight="bold">WIN</text>
+                    </svg>
+                </div>
+                <canvas id="lucky-wheel" width="300" height="300" class="rounded-full shadow-lg border-2 border-blue-400"></canvas>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <button id="spinBtn" class="spin-button w-28 h-28 rounded-full bg-blue-600 text-white text-lg font-bold shadow-lg transform active:scale-95 transition duration-200">
+                        SPIN!
+                    </button>
+                </div>
+            </div>
+            <!-- Leaderboard Palsu -->
+            <div id="fake-leaderboard" class="mt-8 w-full max-w-md mx-auto bg-white bg-opacity-10 rounded-xl border-2 border-yellow-400 shadow-lg">
+                <button id="toggle-leaderboard" class="w-full py-2 text-yellow-400 font-premium text-lg bg-transparent hover:bg-yellow-400 hover:text-white rounded-t-xl transition">Leaderboard Pemenang Minggu Ini &#9660;</button>
+                <div id="leaderboard-content" style="display:none;max-height:220px;overflow-y:auto;">
+                    <ul id="leaderboard-list" class="space-y-2 text-white text-lg font-semibold px-4 pb-4 pt-2 transition-all duration-500">
+                        <!-- Diisi via JS -->
+                    </ul>
+                    </div>
+                </div>
+                <style>
+                    #leaderboard-content {
+                        transition: max-height 0.7s cubic-bezier(.4,2,.3,1), opacity 0.5s;
+                        opacity: 0;
+                        max-height: 0;
+                        overflow-y: auto;
+                        display: none;
+                    }
+                </style>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <!-- Popup Notification Modal -->
+        <div id="popup-modal" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-40 transition-opacity transition-transform duration-500 opacity-0 scale-95 pointer-events-none">
+            <div class="bg-white rounded-xl shadow-2xl px-8 py-6 text-center max-w-xs w-full transition-all duration-500 relative">
+                <div id="popup-message" class="text-lg font-semibold mb-4 text-gray-800"></div>
+                <button id="popup-close" class="mt-2 px-6 py-2 rounded-full bg-blue-500 text-white font-bold hover:bg-blue-600 transition">Tutup</button>
+                <button id="share-btn" class="mt-4 px-6 py-2 rounded-full bg-yellow-400 text-gray-900 font-bold hover:bg-yellow-500 transition flex items-center justify-center mx-auto">
+                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" style="margin-right:8px"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Bagikan
+                </button>
+                <div id="share-modal" style="display:none;position:absolute;bottom:70px;left:50%;transform:translateX(-50%);background:#fff;border-radius:14px;box-shadow:0 2px 16px #FFD700;z-index:10;padding:18px 24px;min-width:180px;transition:opacity 0.4s,transform 0.4s;opacity:0;">
+                    <div class="font-bold text-gray-800 mb-2">Bagikan ke:</div>
+                    <button id="wa-share" class="w-full mb-2 px-4 py-2 rounded-full bg-green-500 text-white font-semibold hover:bg-green-600 transition flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 32 32" fill="none" style="margin-right:6px"><path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.697 4.607 1.902 6.5L4 29l7.667-1.902A11.96 11.96 0 0016 27c6.627 0 12-5.373 12-12S22.627 3 16 3z" fill="#25D366"/><path d="M25.803 22.197C24.07 24.07 21.17 25.5 16 25.5c-1.385 0-2.707-.18-3.95-.53l-.55-.15-4.55 1.13 1.13-4.55-.15-.55C6.68 17.707 6.5 16.385 6.5 15c0-5.17 1.43-8.07 3.303-9.803C11.93 4.43 14.83 3 16 3c5.17 0 8.07 1.43 9.803 3.303C27.57 6.93 29 9.83 29 15c0 1.385-.18 2.707-.53 3.95l-.15.55 1.13 4.55-4.55-1.13-.55-.15z" fill="#fff"/></svg>
+                        WhatsApp
+                    </button>
+                    <button id="tg-share" class="w-full px-4 py-2 rounded-full bg-blue-500 text-white font-semibold hover:bg-blue-600 transition flex items-center justify-center">
+                        <svg width="18" height="18" viewBox="0 0 32 32" fill="none" style="margin-right:6px"><path d="M16 3C9.373 3 4 8.373 4 15c0 2.385.697 4.607 1.902 6.5L4 29l7.667-1.902A11.96 11.96 0 0016 27c6.627 0 12-5.373 12-12S22.627 3 16 3z" fill="#0088cc"/><path d="M23.5 10.5l-11 4.5 4.5 2 2 4.5 4.5-11z" fill="#fff"/></svg>
+                        Telegram
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Share button logic
+        document.addEventListener('DOMContentLoaded', () => {
+            const shareBtn = document.getElementById('share-btn');
+            const shareModal = document.getElementById('share-modal');
+            const waShare = document.getElementById('wa-share');
+            const tgShare = document.getElementById('tg-share');
+            let modalOpen = false;
+            if (shareBtn) {
+                shareBtn.addEventListener('click', () => {
+                    modalOpen = !modalOpen;
+                    if (modalOpen) {
+                        shareModal.style.display = 'block';
+                        setTimeout(() => {
+                            shareModal.style.opacity = '1';
+                            shareModal.style.transform = 'translateX(-50%) scale(1)';
+                        }, 10);
+                    } else {
+                        shareModal.style.opacity = '0';
+                        shareModal.style.transform = 'translateX(-50%) scale(0.95)';
+                        setTimeout(() => {
+                            shareModal.style.display = 'none';
+                        }, 400);
+                    }
+                });
+                // Tutup modal jika klik di luar
+                document.addEventListener('click', (e) => {
+                    if (modalOpen && !shareModal.contains(e.target) && e.target !== shareBtn) {
+                        shareModal.style.opacity = '0';
+                        shareModal.style.transform = 'translateX(-50%) scale(0.95)';
+                        setTimeout(() => {
+                            shareModal.style.display = 'none';
+                            modalOpen = false;
+                        }, 400);
+                    }
+                });
+            }
+            if (waShare) waShare.onclick = () => {
+                window.open('https://klikblg.com/wa-ldb', '_blank');
+            };
+            if (tgShare) tgShare.onclick = () => {
+                window.open('https://t.me/pekerjaldbplay', '_blank');
+            };
+        });
+        // Leaderboard minimize/expand
+        document.addEventListener('DOMContentLoaded', () => {
+            randomLeaderboard();
+            const btn = document.getElementById('toggle-leaderboard');
+            const content = document.getElementById('leaderboard-content');
+            let expanded = false;
+            btn.addEventListener('click', () => {
+                expanded = !expanded;
+                if (expanded) {
+                    content.style.display = 'block';
+                    setTimeout(() => {
+                        content.style.opacity = '1';
+                        content.style.maxHeight = '220px';
+                    }, 10);
+                } else {
+                    content.style.opacity = '0';
+                    content.style.maxHeight = '0';
+                    setTimeout(() => {
+                        content.style.display = 'none';
+                    }, 500);
+                }
+                btn.innerHTML = expanded ? 'Leaderboard Pemenang Minggu Ini &#9650;' : 'Leaderboard Pemenang Minggu Ini &#9660;';
+            });
+        });
+        // Leaderboard palsu
+        const fakeNames = ["Rizky", "Ayu", "Budi", "Cici", "Dimas", "Siti", "Joko", "Lia", "Fajar", "Nina", "Andi", "Putri", "Rama", "Vina", "Yoga", "Dewi", "Bayu", "Tika", "Eko", "Maya"];
+        const fakePrizes = ["5JT", "2JT", "1JT", "500K", "300K", "100K", "50K", "20K", "10K", "ZONK"]; 
+        function randomLeaderboard() {
+            const ul = document.getElementById('leaderboard-list');
+            ul.innerHTML = '';
+            for(let i=0;i<10;i++) {
+                let name = fakeNames[Math.floor(Math.random()*fakeNames.length)] + (Math.random()<0.3 ? 'XX' : '');
+                const prize = fakePrizes[Math.floor(Math.random()*fakePrizes.length)];
+                let isVIP = Math.random() < 0.2;
+                let vipBadge = isVIP ? "<span style='margin-left:6px;padding:2px 8px;border-radius:12px;background:linear-gradient(90deg,#FFD700,#FFFACD);color:#b8860b;font-size:0.9em;font-weight:bold;box-shadow:0 0 8px #FFD700;'>VIP &#x1F451;</span>" : "";
+                const li = document.createElement('li');
+                li.innerHTML = `<span class='text-yellow-300'>${name}${vipBadge}</span> <span class='text-blue-300'>memenangkan</span> <span class='text-yellow-400 font-premium'>${prize}</span>`;
+                ul.appendChild(li);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', randomLeaderboard);
+        // Animasi gradient background grid
+        (function animateGridGradient() {
+            let t = 0;
+            function hsl(h, s, l) {
+                return `hsl(${h},${s}%,${l}%)`;
+            }
+            function loop() {
+                t += 0.005;
+                // Gradual hue shift
+                const h1 = (220 + Math.sin(t) * 20) % 360;
+                const h2 = (245 + Math.cos(t) * 20) % 360;
+                const glowH = (210 + Math.sin(t * 1.5) * 30) % 360;
+                document.body.style.setProperty('--grid-grad1', hsl(h1, 60, 15));
+                document.body.style.setProperty('--grid-grad2', hsl(h2, 60, 10));
+                document.body.style.setProperty('--grid-glow', hsl(glowH, 90, 60) + ',0.10)');
+                requestAnimationFrame(loop);
+            }
+            loop();
+        })();
+        // Global state variables
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyocv5NrigN2bMU0Xzu6b3-3dFEIqpXiTEL4vS59C3lEl2t-Gle_DmVUxlb6qdk8aKt/exec'; // Ganti dengan URL API Apps Script terbaru
+        let userId = '';
+        let couponCode = '';
+        let spinning = false;
+
+        // UI Elements
+        const gateScreen = document.getElementById('gate-screen');
+        const spinScreen = document.getElementById('spin-screen');
+        const loginForm = document.getElementById('login-form');
+        const userIdInput = document.getElementById('userId');
+        const couponCodeInput = document.getElementById('couponCode');
+        const submitBtn = document.getElementById('submitBtn');
+        const spinBtn = document.getElementById('spinBtn');
+        const loadingSpinner = document.getElementById('loading');
+        const displayId = document.getElementById('displayId');
+        const displayCoupon = document.getElementById('displayCoupon');
+        const toastContainer = document.getElementById('toast-container');
+        
+        // Wheel setup
+        const canvas = document.getElementById('lucky-wheel');
+        const ctx = canvas.getContext('2d');
+        const prizes = ["1K", "2K", "20K", "50K", "ZONK", "100K", "300K", "500K", "1JT", "2JUTA"];
+        const prizeColors = ["#ef4444", "#f97316", "#f59e0b", "#eab308", "#22c55e", "#10b981", "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6"];
+        const numSegments = prizes.length;
+        const arc = 2 * Math.PI / numSegments;
+        let startAngle = 0;
+        let winnerIndex = -1;
+
+        // Function to show toast messages
+        // Function to show popup modal messages
+        function showPopup(message, type = 'success') {
+            const popupModal = document.getElementById('popup-modal');
+            const popupMessage = document.getElementById('popup-message');
+            popupMessage.textContent = message;
+            popupMessage.className = 'text-lg font-semibold mb-4';
+            if (type === 'success') {
+                popupMessage.classList.add('text-green-600');
+            } else if (type === 'error') {
+                popupMessage.classList.add('text-red-600');
+            } else if (type === 'warning') {
+                popupMessage.classList.add('text-yellow-600');
+            }
+            popupModal.classList.remove('pointer-events-none');
+            popupModal.classList.add('opacity-100', 'scale-100');
+            popupModal.classList.remove('opacity-0', 'scale-95');
+        }
+
+        // Close popup modal
+        document.addEventListener('DOMContentLoaded', () => {
+            const popupModal = document.getElementById('popup-modal');
+            const popupClose = document.getElementById('popup-close');
+            popupClose.addEventListener('click', () => {
+                popupModal.classList.remove('opacity-100', 'scale-100');
+                popupModal.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    popupModal.classList.add('pointer-events-none');
+                }, 400);
+            });
+        });
+
+        // Draw the lucky wheel
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.font = '16px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            let highlightIndex = -1;
+            if (!spinning && winnerIndex !== -1) highlightIndex = winnerIndex;
+
+            prizes.forEach((prize, i) => {
+                const angle = startAngle + i * arc;
+                ctx.save();
+                // Highlight segmen pemenang
+                if (i === highlightIndex) {
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 30;
+                    ctx.lineWidth = 6;
+                } else {
+                    ctx.shadowBlur = 0;
+                    ctx.lineWidth = 2;
+                }
+                // Draw arc
+                ctx.beginPath();
+                ctx.arc(150, 150, 140, angle, angle + arc);
+                ctx.lineTo(150, 150);
+                ctx.fillStyle = prizeColors[i % prizeColors.length];
+                ctx.fill();
+                ctx.strokeStyle = i === highlightIndex ? '#FFD700' : '#fff';
+                ctx.stroke();
+                ctx.restore();
+
+                // Draw text
+                ctx.save();
+                ctx.translate(150 + Math.cos(angle + arc / 2) * 100, 150 + Math.sin(angle + arc / 2) * 100);
+                ctx.rotate(angle + arc / 2 + Math.PI / 2);
+                ctx.fillStyle = '#fff';
+                ctx.font = i === highlightIndex ? 'bold 18px Inter, sans-serif' : '16px Inter, sans-serif';
+                ctx.fillText(prize, 0, 0);
+                ctx.restore();
+            });
+        }
+        drawWheel();
+
+        // Spin Logic
+        // Tidak perlu pickPrize, hadiah diatur dari GS
+        
+        function getSegmentIndex(prizeName) {
+            return prizes.indexOf(prizeName);
+        }
+
+        async function spinWheel() {
+            // Cek localStorage dan status kupon
+            const winners = JSON.parse(localStorage.getItem('lucky_winners')) || [];
+            const existingWinner = winners.find(w => w.coupon === couponCode);
+            if (spinning || existingWinner) {
+                showPopup('Kupon ini sudah digunakan, spin dinonaktifkan.', 'error');
+                spinBtn.disabled = true;
+                return;
+            }
+            spinning = true;
+            spinBtn.disabled = true;
+            // Mulai animasi spin langsung
+            const finalPrize = '1,000';
+            const finalIndex = getSegmentIndex('1K');
+            const totalRotations = 5;
+            const targetAngle = (2 * Math.PI * totalRotations) + (Math.PI * 1.5) - (finalIndex * arc) - (arc / 2);
+            const duration = 3000;
+
+            // Catat ke sheet di background, popup error setelah animasi
+            let sheetError = null;
+            recordWinnerToSheet(userId, couponCode).then(result => {
+                if (!result || (result.status !== 'success' && !(result.message && result.message.includes('sudah digunakan')))) {
+                    sheetError = 'Gagal mencatat hadiah ke sheet: ' + (result ? result.message : '');
+                }
+            });
+
+            // Spin animasi
+            let startTime;
+            function animateSpin(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const elapsedTime = currentTime - startTime;
+                if (elapsedTime >= duration) {
+                    startAngle = targetAngle % (2 * Math.PI);
+                    spinning = false;
+                    spinBtn.disabled = true;
+                    winnerIndex = finalIndex;
+                    drawWheel();
+                    if (sheetError) {
+                        showPopup(sheetError, 'error');
+                    } else {
+                        showPopup(`Selamat! Anda memenangkan ${finalPrize}!`, 'success');
+                        showConfetti(false);
+                        saveWinner(userId, couponCode, finalPrize);
+                    }
+                    return;
+                }
+                const t = 1 - Math.pow(1 - elapsedTime / duration, 3);
+                startAngle = (t * targetAngle) % (2 * Math.PI);
+                drawWheel();
+                requestAnimationFrame(animateSpin);
+            }
+            requestAnimationFrame(animateSpin);
+        }
+
+        // --- Event Listeners ---
+        
+        // Form validation
+        function validateForm() {
+            const userIdValid = userIdInput.value.trim().length >= 4;
+            const couponValid = couponCodeInput.value.trim().length > 0;
+            submitBtn.disabled = !(userIdValid && couponValid);
+        }
+        userIdInput.addEventListener('input', validateForm);
+        couponCodeInput.addEventListener('input', () => {
+            couponCodeInput.value = couponCodeInput.value.toUpperCase();
+            validateForm();
+        });
+
+        // Form submission (Coupon verification)
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            userId = userIdInput.value.trim();
+            couponCode = couponCodeInput.value.trim();
+
+            loadingSpinner.classList.remove('hidden');
+            // Progress bar animation
+            const progressBar = document.getElementById('progress-bar');
+            let progress = 0;
+            let progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 90) progress = 90;
+                progressBar.style.width = progress + '%';
+            }, 100);
+
+            try {
+                // Check if coupon is already in localStorage
+                const winners = JSON.parse(localStorage.getItem('lucky_winners')) || [];
+                const existingWinner = winners.find(w => w.coupon === couponCode);
+
+                // Jangan blokir jika sudah digunakan, tetap lanjut ke spin
+                const url = `${API_URL}?coupon=${couponCode}&id=${userId}`;
+                const response = await fetch(url);
+                const result = await response.json();
+                // Anggap valid jika status 'success' (pencatatan berhasil)
+                if (result.status === 'success') {
+                    showPopup('Verifikasi kupon berhasil!', 'success');
+                    gateScreen.classList.add('opacity-0');
+                    setTimeout(() => {
+                        gateScreen.classList.add('hidden');
+                        spinScreen.classList.remove('hidden');
+                        spinScreen.classList.remove('opacity-0');
+                        displayId.textContent = userId;
+                        displayCoupon.textContent = couponCode;
+                    }, 500);
+                } else {
+                    showPopup('Kupon tidak valid. Silakan coba lagi.', 'error');
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                showPopup('Terjadi kesalahan saat verifikasi.', 'error');
+            } finally {
+                clearInterval(progressInterval);
+                progressBar.style.width = '100%';
+                setTimeout(() => {
+                    loadingSpinner.classList.add('hidden');
+                    progressBar.style.width = '0%';
+                }, 400);
+            }
+        });
+
+        // Spin button click
+        spinBtn.addEventListener('click', spinWheel);
+        
+        // Save winner to localStorage
+        function saveWinner(id, coupon, prize) {
+            const winners = JSON.parse(localStorage.getItem('lucky_winners')) || [];
+            winners.push({
+                id,
+                coupon,
+                prize,
+                timestamp: new Date().toISOString()
+            });
+            localStorage.setItem('lucky_winners', JSON.stringify(winners));
+        }
+
+        // New function to record winner to Google Sheet via POST request
+        async function recordWinnerToSheet(id, coupon) {
+            try {
+                const url = `${API_URL}?id=${encodeURIComponent(id)}&coupon=${encodeURIComponent(coupon)}`;
+                const response = await fetch(url);
+                return await response.json();
+            } catch (error) {
+                return null;
+            }
+        }
+        
+    </script>
+</body>
+</html>
